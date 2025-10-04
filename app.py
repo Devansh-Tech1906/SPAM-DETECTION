@@ -1,5 +1,5 @@
 # app.py
-# Removed PDF generation logic and the fpdf2 dependency.
+# Final version with the database initialization fix for production servers.
 
 import joblib
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash, make_response
@@ -7,25 +7,23 @@ import os
 import sqlite3
 from datetime import datetime
 import math
-import io  # Required for in-memory file handling
-import csv # Required for CSV generation
-# The 'from fpdf import FPDF' import has been removed.
+import io
+import csv
 
 # --- Initialization ---
 app = Flask(__name__)
-app.secret_key = os.urandom(24) 
+app.secret_key = os.urandom(24)
 ADMIN_PASSWORD = os.environ.get('SPAM_ADMIN_PASSWORD', 'admin')
 DATABASE = 'predictions.db'
 
-# The custom PDFReport class has been removed.
-
-# --- Database & Model Loading (No Changes) ---
+# --- Database & Model Loading ---
 def get_db_connection():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
+    # This function now uses app.app_context() to work correctly on startup.
     with app.app_context():
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -51,7 +49,13 @@ try:
 except FileNotFoundError:
     model, vectorizer = None, None
 
-# --- Public & Admin Routes (No Changes) ---
+# ----- THE FIX IS HERE -----
+# We call the database initialization function right after the app is created.
+# This ensures it runs every time, even when started by Gunicorn on Render.
+init_db()
+# ---------------------------
+
+# --- Public & Admin Routes (No changes below this line) ---
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -112,19 +116,14 @@ def admin_logout():
     flash('You have been successfully logged out.', 'info')
     return redirect(url_for('admin_login'))
 
-# --- Updated Download Route ---
 @app.route('/admin/download/<format>')
 def download_report(format):
-    """Generates and serves a CSV file of the prediction history."""
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin_login'))
-
     conn = get_db_connection()
     records = conn.execute('SELECT timestamp, input_text, prediction, spam_probability FROM predictions ORDER BY id DESC').fetchall()
     conn.close()
-
     if format == 'csv':
-        # --- Generate CSV ---
         string_io = io.StringIO()
         csv_writer = csv.writer(string_io)
         csv_writer.writerow(['Timestamp', 'Input Text', 'Prediction', 'Spam Probability'])
@@ -133,17 +132,13 @@ def download_report(format):
                 record['timestamp'], record['input_text'], record['prediction'],
                 f"{record['spam_probability']:.2%}"
             ])
-        
         output = make_response(string_io.getvalue())
         output.headers["Content-Disposition"] = "attachment; filename=prediction_history.csv"
         output.headers["Content-type"] = "text/csv"
         return output
-
-    # If the format is not 'csv', return an error.
     return "Invalid format", 404
 
-# --- Main Execution ---
+# --- Main Execution (Now only used for local development) ---
 if __name__ == '__main__':
-    init_db()
     app.run(host='0.0.0.0', port=5000, debug=True)
 

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spam Detector AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #121828;
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --card-bg: #1a2238;
+            --text-color: #f0f4f9;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --success-color: #22c55e;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            overflow-x: hidden;
+            background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+        .container {
+            background: var(--card-bg);
+            padding: 2rem 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 650px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            animation: fadeIn 1s ease-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+        .logo { font-size: 2.25rem; }
+        .header h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--text-color);
+        }
+        .header + p { color: var(--text-muted); font-size: 1.1rem; margin-top: 0; margin-bottom: 2rem;}
+        textarea {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-size: 1rem;
+            min-height: 180px;
+            box-sizing: border-box;
+            resize: vertical;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            background-color: #293451;
+            color: var(--text-color);
+            margin-bottom: 1.5rem;
+        }
+        textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.4); }
+        textarea::placeholder { color: var(--text-muted); }
+        .button-group { display: flex; gap: 1rem; justify-content: center; }
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        button:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+        #clearBtn { background-color: #475569; }
+        #clearBtn:hover { background-color: #64748b; }
+        #result-container { margin-top: 2rem; opacity: 0; transform: translateY(10px); transition: all 0.5s ease; height: 0; overflow: hidden; }
+        #result-container.visible { opacity: 1; transform: translateY(0); height: auto; }
+        .result-box { padding: 1.25rem; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 1rem; }
+        .result-icon { font-size: 2rem; }
+        .result-text { font-size: 1.5rem; font-weight: 700; }
+        .result-ham { background-color: rgba(34, 197, 94, 0.1); color: var(--success-color); border: 1px solid var(--success-color); }
+        .result-spam { background-color: rgba(239, 68, 68, 0.1); color: var(--danger-color); border: 1px solid var(--danger-color); }
+        .probability-gauge { width: 100%; height: 10px; background-color: #334155; border-radius: 10px; margin-top: 1rem; overflow: hidden; }
+        .gauge-fill { height: 100%; width: 0%; border-radius: 10px; transition: width 0.8s ease-in-out; }
+        .spinner { border: 3px solid rgba(255,255,255,0.2); width: 20px; height: 20px; border-radius: 50%; border-left-color: #fff; animation: spin 1s linear infinite; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; }
+        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+        button.loading .button-text { visibility: hidden; }
+        button.loading .spinner { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="logo">🛡️</span>
+            <h1>Spam Detector AI</h1>
+        </div>
+        <p>Analyze any text and get an instant verdict from the AI.</p>
+        <textarea id="emailText" placeholder="Example: Congratulations! You've won a free cruise..."></textarea>
+        <div class="button-group">
+            <button id="predictBtn">
+                <span class="button-text">Analyze</span>
+                <div class="spinner"></div>
+            </button>
+            <button id="clearBtn">Clear</button>
+        </div>
+        <div id="result-container">
+            <div id="result-box" class="result-box">
+                <span id="result-icon" class="result-icon"></span>
+                <span id="predictionResult" class="result-text"></span>
+            </div>
+            <div class="probability-gauge">
+                <div id="gauge-fill" class="gauge-fill"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // JS logic is unchanged and remains here.
+        const emailTextArea = document.getElementById('emailText');
+        const predictBtn = document.getElementById('predictBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const resultContainer = document.getElementById('result-container');
+        const resultBox = document.getElementById('result-box');
+        const resultIcon = document.getElementById('result-icon');
+        const predictionResult = document.getElementById('predictionResult');
+        const gaugeFill = document.getElementById('gauge-fill');
+        predictBtn.addEventListener('click', classifyEmail);
+        clearBtn.addEventListener('click', () => {
+            emailTextArea.value = '';
+            resultContainer.classList.remove('visible');
+        });
+        async function classifyEmail() {
+            const emailText = emailTextArea.value;
+            if (!emailText.trim()) { alert('Please enter some text.'); return; }
+            predictBtn.disabled = true;
+            predictBtn.classList.add('loading');
+            resultContainer.classList.remove('visible');
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email_text: emailText })
+                });
+                if (!response.ok) throw new Error(`Server error: ${response.status}`);
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                console.error("API Call Error:", error);
+                alert('Could not connect to the model.');
+            } finally {
+                predictBtn.disabled = false;
+                predictBtn.classList.remove('loading');
+            }
+        }
+        function displayResults(data) {
+            const probability = parseFloat(data.spam_probability.replace('%', ''));
+            predictionResult.textContent = data.prediction;
+            if (data.prediction === 'SPAM') {
+                resultBox.className = 'result-box result-spam';
+                resultIcon.textContent = '⚠️';
+            } else {
+                resultBox.className = 'result-box result-ham';
+                resultIcon.textContent = '✅';
+            }
+            gaugeFill.style.width = `${probability}%`;
+            if (probability > 75) gaugeFill.style.backgroundColor = 'var(--danger-color)';
+            else if (probability > 40) gaugeFill.style.backgroundColor = 'var(--warning-color)';
+            else gaugeFill.style.backgroundColor = 'var(--success-color)';
+            resultContainer.classList.add('visible');
+        }
+    </script>
+</body>
+</html>
+
